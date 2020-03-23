@@ -1,0 +1,20 @@
+# Visual Studio Code
+.vscode/
+
+# Example data
+/data/*
+!/data/*.sh
+
+# Trained Models
+/models
+
+# Python
+*.pyc
+__pycache__/
+venv/
+
+# Torchtext
+.vector_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints/

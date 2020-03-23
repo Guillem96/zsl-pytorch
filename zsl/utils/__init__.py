@@ -1,0 +1,1 @@
+from .text import wikipedia_description
