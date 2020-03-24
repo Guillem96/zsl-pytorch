@@ -5,8 +5,6 @@ import torch
 
 def l2_dist(a: torch.FloatTensor, b: torch.FloatTensor) -> torch.FloatTensor:
     '''
-    Credits: https://discuss.pytorch.org/t/batched-pairwise-distance/39611/2
-    
     Implements L2 Distance
 
     Parameters
@@ -22,13 +20,11 @@ def l2_dist(a: torch.FloatTensor, b: torch.FloatTensor) -> torch.FloatTensor:
         [N, M] Tensor where index i,j contains the distance between 
         a[i] and y[j]
     '''
-    a_norm = (a**2).sum(1).view(-1, 1)
+    dists = torch.ones(a.size(0), b.size(0)).to(a.device)
+    for i in range(a.size(0)):
+        dists[i] = (a[i] - b).pow(2).sum(dim=-1).sqrt()
 
-    b_t = torch.transpose(b, 0, 1)
-    b_norm = (b**2).sum(1).view(1, -1)
-    
-    dist = a_norm + b_norm - 2.0 * torch.mm(a, b_t)
-    return dist.clamp(min=0.0)
+    return dists.clamp(min=0.0)
 
 
 def top_k_accuracy(image_embeddigs: torch.FloatTensor, 
@@ -44,10 +40,9 @@ def top_k_accuracy(image_embeddigs: torch.FloatTensor,
     
     dists = l2_dist(image_embeddigs, class_semantics)
     
-    preds_k = (-dists).topk(k).indices
+    preds_k = (-dists).topk(k, dim=-1).indices
     y_true = y_true.unsqueeze(1).repeat(1, k)
 
-    pred_ids = predict(image_embeddigs, class_semantics)
     return (preds_k == y_true).any(-1).sum() / float(y_true.size(0))
 
 

@@ -10,8 +10,6 @@ class ZeroShot(nn.Module):
         super(ZeroShot, self).__init__()
 
         self.visual_fe = visual_fe 
-        for p in self.visual_fe.parameters():
-            p.requires_grad = False
 
         self.semantic_unit = semantic_unit
         self.linear = nn.Linear(semantic_unit.out_features, 
@@ -32,4 +30,7 @@ class ZeroShot(nn.Module):
             semantic_embedding = self.relu(self.linear(semantic_embedding))
             res.append(semantic_embedding)
 
+        if len(res) == 1:
+            return res[0]
+            
         return res

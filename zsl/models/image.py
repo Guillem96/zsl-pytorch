@@ -8,7 +8,7 @@ _AVAILABLE_FE = ['resnet50', 'densenet121']
 
 class VisualFeatureExtractor(nn.Module):
 
-    def __init__(self, feature_extractor: str):
+    def __init__(self, feature_extractor: str, trainable: bool = False):
         super(VisualFeatureExtractor, self).__init__()
 
         assert feature_extractor in _AVAILABLE_FE, \
@@ -33,7 +33,7 @@ class VisualFeatureExtractor(nn.Module):
                 _build_densenet(zoo.densenet121(pretrained=True))
         
         for p in self.conv.parameters():
-            p.requires_grad = False
+            p.requires_grad = trainable
 
     def forward(self, x: torch.FloatTensor) -> torch.FloatTensor:
         return self.conv(x).view(x.size(0), -1)
