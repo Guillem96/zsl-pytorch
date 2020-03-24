@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Mapping, Collection, Callable
+from typing import Any, Mapping, Collection, Callable
 
 import torch
 from torch.utils.data import Dataset
@@ -76,6 +76,9 @@ class ZSLImageFolder(ImageFolder):
         self.class_to_repr = class_to_repr
         self.zero_shot_classes = zero_shot_classes
         self.load_unseen = load_unseen
+
+    def semantic_representations(self) -> Mapping[str, Any]:
+        return [self.class_to_repr(o) for o in self.classes]
 
     def __getitem__(self, index: int):
         path, target = self.samples[index]

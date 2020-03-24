@@ -18,7 +18,8 @@ class LinearSemanticUnit(nn.Module):
         super(LinearSemanticUnit, self).__init__()
         self.linear = nn.Linear(in_features, out_features)
         self.relu = nn.ReLU()
-    
+        self.out_features = out_features
+        
     def forward(self, x: torch.Tensor) -> torch.FloatTensor:
         return self.relu(self.linear(x))
 
@@ -45,13 +46,15 @@ class MultiModalSemanticUnit(nn.Module):
         consistent through all branches
     """
     def __init__(self, 
-                 n_branches: int = 2, 
-                 features: Union[int, Sequence[int]]):
+                 in_features: Union[int, Sequence[int]],
+                 out_features: int,
+                 n_branches: int = 2):
         super(MultiModalSemanticUnit, self).__init__()
 
         if isinstance(in_features, int):
             in_features = [in_features] * n_branches
-        
+
+        self.out_features = out_features       
         self.n_branches = n_branches        
         self.branches = nn.ModuleList([
             nn.Linear(f, out_features) for f in in_features])
@@ -89,6 +92,7 @@ class BidirectionalSemanticUnit(nn.Module):
                  out_features: int):
 
         super(BidirectionalSemanticUnit, self).__init__()
+        self.out_features = out_features
         
         self.embedding = nn.Embedding(embedding_matrix.size(0),
                                       embedding_matrix.size(1),
@@ -97,7 +101,8 @@ class BidirectionalSemanticUnit(nn.Module):
         self.embedding.weight.requires_grad = False
 
         self.hidden_size = hidden_size
-        self.lstm = nn.LSTM(batch_first=True, 
+        self.lstm = nn.LSTM(embedding_matrix.size(1),
+                            batch_first=True, 
                             hidden_size=hidden_size, 
                             num_layers=2,
                             bidirectional=True,
@@ -112,7 +117,6 @@ class BidirectionalSemanticUnit(nn.Module):
         batch, seq_len = x.size()
         x = self.embedding(x)
         _, (h_n, _) = self.lstm(x)
-        h_n = h_n[-1] # last layer
 
         # x: [N_LAYERS, DIRECTIONS, BATCH, HIDDEN_SIZE]
         x = h_n.view(-1, 2, batch, self.hidden_size)

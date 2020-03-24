@@ -3,7 +3,7 @@ import torch.nn as nn
 import torchvision.models as zoo
 
 
-_AVAILABLE_FE = ['resnet50']
+_AVAILABLE_FE = ['resnet50', 'densenet121']
 
 
 class VisualFeatureExtractor(nn.Module):
@@ -31,6 +31,9 @@ class VisualFeatureExtractor(nn.Module):
         elif feature_extractor == 'densenet121':
             self.conv, self.features = \
                 _build_densenet(zoo.densenet121(pretrained=True))
-    
+        
+        for p in self.conv.parameters():
+            p.requires_grad = False
+
     def forward(self, x: torch.FloatTensor) -> torch.FloatTensor:
         return self.conv(x).view(x.size(0), -1)
