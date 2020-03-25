@@ -12,22 +12,26 @@ def collate_image_folder(batch: Tuple[Any, Any, Any],
                                                          torch.LongTensor, 
                                                          torch.Tensor]:
     """
-    Predefinet collate function for torch.DataLoader.
+    Predefined collate function for torch.DataLoader.
 
     Parameters
     ----------
     batch: Tuple[Any, _, Any]
     padding_idx: int, default -1
-        Padding value used to pad the semantic representation of labels
+        Padding value used to pad the semantic representation of labels. If 
+        padding_idx is left to -1, no padding will be applied
     
     Returns
     -------
     Tuple[torch.Tensor, torch.Tensor]
     """
     images, labels, semantics = zip(*batch)
-    semantics = [o if isinstance(o, torch.Tensor) else torch.tensor(o) 
-                 for o in semantics]
-    semantics = pad_sequence(semantics, batch_first=True)
+    if padding_idx != -1:
+        semantics = [o if isinstance(o, torch.Tensor) else torch.tensor(o) 
+                    for o in semantics]
+        semantics = pad_sequence(semantics, batch_first=True)
+    else: 
+        semantics = torch.FloatTensor(semantics)
     return torch.stack(images), torch.LongTensor(labels), semantics
 
     
@@ -54,18 +58,18 @@ def split_classes(all_classes: Sequence[Any],
     """
     Splits a sequence of elements in two sets. 
     This function is handy when splitting classes in zero shot and
-    non sero shot.
+    non zero shot.
 
     Parameters
     ----------
     all_classes: Sequence[Any]
         All classes. 
     zs_prob: float
-        Pobability that a class belongs to zero shot learning
+        Probability that a class belongs to zero shot learning
     
     Retruns
     -------
-    Tuple[Sequenc[Any], Sequence[Any]]
+    Tuple[Sequence[Any], Sequence[Any]]
 
     """
     zs_classes = []

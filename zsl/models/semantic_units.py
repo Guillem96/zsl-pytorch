@@ -93,6 +93,7 @@ class BidirectionalSemanticUnit(nn.Module):
 
         super(BidirectionalSemanticUnit, self).__init__()
         self.out_features = out_features
+        self.padding_idx = padding_idx
         
         self.embedding = nn.Embedding(embedding_matrix.size(0),
                                       embedding_matrix.size(1),
@@ -115,7 +116,11 @@ class BidirectionalSemanticUnit(nn.Module):
 
     def forward(self, x: torch.LongTensor) -> torch.FloatTensor:
         batch, seq_len = x.size()
+        lengths = (x != self.padding_idx).sum(-1)
+
         x = self.embedding(x)
+        x = torch.nn.utils.rnn.pack_padded_sequence(
+            x, lengths, batch_first=True, enforce_sorted=False) 
         _, (h_n, _) = self.lstm(x)
 
         # x: [N_LAYERS, DIRECTIONS, BATCH, HIDDEN_SIZE]

@@ -66,16 +66,19 @@ def train_epoch(model: ZeroShot,
     print()
     print(f'Epoch [{epoch}] [{len(dl)}/{len(dl)}] loss: {loss_mean:.4f}')
 
+
 _Metric = Callable[[torch.FloatTensor, 
                     torch.FloatTensor, 
                     torch.LongTensor], torch.FloatTensor]
+_Metrics =  Mapping[str, _Metric]
+
 
 @torch.no_grad()
 def evaluate(model: ZeroShot,
              dl: torch.utils.data.DataLoader,
              class_representations: Sequence[torch.Tensor],
-             metrics: Mapping[str, _Metric] = {'accuracy': accuracy, 
-                                               'top_5_accuracy': top_5_accuracy},
+             metrics: _Metrics = {'accuracy': accuracy, 
+                                  'top_5_accuracy': top_5_accuracy},
              device: torch.device = torch.device('cpu'),
              padding_idx: int = 0):
     """
