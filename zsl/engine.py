@@ -136,4 +136,5 @@ def evaluate(model: ZeroShot,
 
     print()
     print('Validation', metrics_str)
+    return mean_metrics
     
