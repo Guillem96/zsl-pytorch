@@ -128,3 +128,48 @@ class BidirectionalSemanticUnit(nn.Module):
         
         # Join hidden states from both directions
         return self.multimodal(x[-1])
+
+
+class BERTSemanticUnit(nn.Module):
+    def __init__(self, 
+                 weights: str = 'bert-uncase-base', 
+                 out_features: int = 1024,
+                 padding_idx: int = 0):
+        super(BERTSemanticUnit, self).__init__()
+
+        import transformers
+        
+        self.model = transformers.BertModel.from_pretrained(weights,
+            output_hidden_states=True)
+        self.pooler = nn.Linear(self.model.config.hidden_size, out_features)
+        self.padding_idx = padding_idx
+        self.out_features = out_features
+
+        self.weights = nn.Parameter(
+            torch.Tensor(self.model.config.num_hidden_layers + 1),
+            requires_grad=True)
+
+        for p in self.model.parameters():
+            p.requires_grad = False
+
+    def forward(self, x: torch.LongTensor) -> torch.FloatTensor:
+        segments_ids = torch.zeros_like(x)
+        attention_mask = (x != self.padding_idx).float()
+        _, _, hidden_states = self.model(
+            x, attention_mask=attention_mask, token_type_ids=segments_ids)
+        
+        # hidden_states: list of [BATCH, SQUENCE, HIDDEN SIZE]
+        weights = self.weights.softmax(dim=0)
+        hidden_states = [hs * w for hs, w in zip(hidden_states, weights)]
+
+        # hidden_states: [N_LAYERS, BATCH, SQUENCE, HIDDEN SIZE]
+        hidden_states = torch.stack(hidden_states)
+
+        # hidden_states: list of [BATCH, N_LAYERS, SQUENCE, HIDDEN SIZE]
+        hidden_states = hidden_states.permute(1, 0, 2, 3)
+
+        # hidden_states: list of [BATCH, SQUENCE, HIDDEN SIZE]
+        hidden_states = hidden_states.sum(1)
+
+        pooled_hs = self.pooler(hidden_states)
+        return torch.tanh(pooled_hs.mean(1))
