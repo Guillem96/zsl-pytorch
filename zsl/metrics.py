@@ -24,7 +24,7 @@ def l2_dist(a: torch.FloatTensor, b: torch.FloatTensor) -> torch.FloatTensor:
     for i in range(a.size(0)):
         dists[i] = (a[i] - b).pow(2).sum(dim=-1).sqrt()
 
-    return dists.clamp(min=0.0)
+    return dists
 
 
 def top_k_accuracy(image_embeddigs: torch.FloatTensor, 
@@ -40,7 +40,7 @@ def top_k_accuracy(image_embeddigs: torch.FloatTensor,
     
     dists = l2_dist(image_embeddigs, class_semantics)
     
-    preds_k = (-dists).topk(k, dim=-1).indices
+    preds_k = dists.topk(k, largest=False, dim=-1).indices
     y_true = y_true.unsqueeze(1).repeat(1, k)
 
     return (preds_k == y_true).any(-1).sum() / float(y_true.size(0))

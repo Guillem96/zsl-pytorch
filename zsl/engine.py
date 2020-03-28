@@ -35,11 +35,8 @@ def train_epoch(model: ZeroShot,
         torch.device('cuda') or torch.device('cpu')
     """
     running_loss = 0.
+    model.train()
     for i, (images, _, semantics) in enumerate(dl):
-        model.train()
-
-        print('.', end='')
-        sys.stdout.flush()
 
         images = images.to(device)
         semantics = semantics.to(device)
@@ -58,12 +55,10 @@ def train_epoch(model: ZeroShot,
         
         if (i + 1) % print_freq == 0:
             loss_mean = running_loss / i
-            print()
             print(f'Epoch [{epoch}] [{i}/{len(dl)}] '
                   f'loss: {loss_mean:.4f}')
 
     loss_mean = running_loss / len(dl)
-    print()
     print(f'Epoch [{epoch}] [{len(dl)}/{len(dl)}] loss: {loss_mean:.4f}')
 
 
@@ -107,8 +102,12 @@ def evaluate(model: ZeroShot,
     # Convert descriptions to tensor padding it
     descriptions = [torch.tensor(d) if not isinstance(d, torch.Tensor) else d
                     for d in class_representations]
-    descriptions = torch.nn.utils.rnn.pad_sequence(
-        descriptions, batch_first=True, padding_value=padding_idx)
+    if padding_idx != -1:
+        descriptions = torch.nn.utils.rnn.pad_sequence(
+            descriptions, batch_first=True, padding_value=padding_idx)
+    else:
+        descriptions = torch.stack(descriptions)
+
     semantic_repr = model(semantic_repr=descriptions.to(device))
 
     # Initialize running metrics to 0
@@ -116,8 +115,6 @@ def evaluate(model: ZeroShot,
     running_metrics['loss'] = 0.
 
     for i, (images, y_true, semantics) in enumerate(dl):
-        print('.', end='')
-        sys.stdout.flush()
 
         images = images.to(device)
         semantics = semantics.to(device)
@@ -134,7 +131,6 @@ def evaluate(model: ZeroShot,
     mean_metrics = {m: v / float(len(dl)) for m, v in running_metrics.items()}
     metrics_str = ' '.join(f'{m}: {v:.4f}' for m, v in mean_metrics.items())
 
-    print()
     print('Validation', metrics_str)
     return mean_metrics
     

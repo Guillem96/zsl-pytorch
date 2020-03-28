@@ -1,10 +1,10 @@
 from pathlib import Path
-from typing import Any, Mapping, Collection, Callable, Sequence
+from typing import Any, Mapping, Collection, Callable, Sequence, Union
 
 import torch
 from torch.utils.data import Dataset
 
-from torchvision.datasets import ImageFolder
+from torchvision.datasets import ImageFolder, folder
 
 
 class ZSLImageFolder(ImageFolder):
@@ -117,3 +117,83 @@ class ZSLImageFolder(ImageFolder):
             target = self.target_transform(target)
 
         return sample, target, semantic
+
+
+class AwAFeaturesDataset(Dataset):
+
+    def __init__(self, 
+                 root: str, 
+                 features_type: str = 'cq-hist',
+                 load_unseen: bool = False,
+                 load_only_unseen: bool = False):
+
+        root = Path(root)
+        assert root.exists()
+
+        features_root = root / 'Features' / features_type
+        assert features_root.exists()
+
+        # Build class to idx
+        def file_to_mapping(f):
+            split_lines = f.open().readlines()
+            split_lines = (o.split('\t') for o in split_lines)
+            return {c.strip(): int(i) - 1 for i, c in split_lines}
+
+        self.class_to_idx = file_to_mapping(root / 'classes.txt')
+
+        # Get Zero Shot classes and Non Zero Shot
+        def get_classes(f):
+            return [o.split('\t')[-1].strip() for o in f.open().readlines()]
+
+        self.training_casses = get_classes(root / 'trainclasses.txt')
+        self.zero_shot_classes = get_classes(root / 'testclasses.txt')
+        self.classes = get_classes(root / 'classes.txt')
+
+        # Generate attributes name to idx
+        self.attrs = get_classes(root / 'predicates.txt')
+        self.attr_to_idx = file_to_mapping(root / 'predicates.txt')
+
+        # Load mapping class to features
+        self.attr_matrix = root / 'predicate-matrix-continuous.txt'
+        self.attr_matrix = self.attr_matrix.open().readlines()
+        self.attr_matrix = [list(map(float, l.split())) 
+                            for l in self.attr_matrix]
+        # self.attr_matrix = torch.FloatTensor(self.attr_matrix)
+
+        # Create the dataset samples from folder
+        self.samples = folder.make_dataset(str(features_root), 
+                                           self.class_to_idx, 
+                                           extensions=('.txt', ))
+
+        if not load_unseen:
+            self.samples = [(p, t) for p, t in self.samples 
+                            if self.classes[t] in self.training_casses]
+            
+        if load_only_unseen:
+            self.samples = [(p, t) for p, t in self.samples 
+                            if self.classes[t] in self.zero_shot_classes]
+
+    @property
+    def valid_classes(self):
+        path_2_label = lambda p: Path(p).parent.stem
+        return set(path_2_label(o[0]) for o in self.samples)
+    
+    def class_to_repr(self, class_: Union[str, int]):
+        if isinstance(class_, str):
+            class_ = self.class_to_idx[class_]
+        return self.attr_matrix[class_]
+
+    def loader(self, p: str):
+        with open(p) as f:
+            features = [float(o) for o in f.read().split()]
+        return torch.FloatTensor(features)
+            
+    def __getitem__(self, index: int):
+        path, target = self.samples[index]
+        sample = self.loader(path)
+        semantic = self.class_to_repr(target)
+
+        return sample, target, (semantic - 5. / 2.)
+    
+    def __len__(self):
+        return len(self.samples)

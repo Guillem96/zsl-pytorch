@@ -6,6 +6,16 @@ import torchvision.models as zoo
 _AVAILABLE_FE = ['resnet50', 'resnet152', 'densenet121', 'inception_v3']
 
 
+class Identity(nn.Module):
+    """Use this model when your dataset uses precomputed features"""
+    def __init__(self, features: int):
+        super(Identity, self).__init__()
+
+        self.features = features
+    
+    def forward(self, x): return x
+
+
 class VisualFeatureExtractor(nn.Module):
 
     def __init__(self, feature_extractor: str, trainable: bool = False):
