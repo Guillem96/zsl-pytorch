@@ -31,7 +31,7 @@ def collate_image_folder(batch: Tuple[Any, Any, Any],
                     for o in semantics]
         semantics = pad_sequence(semantics, batch_first=True)
     else: 
-        semantics = torch.FloatTensor(semantics)
+        semantics = torch.stack(semantics)
     return torch.stack(images), torch.LongTensor(labels), semantics
     
 def seed(s: int = 0):

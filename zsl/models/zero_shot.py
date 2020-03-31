@@ -15,7 +15,7 @@ class ZeroShot(nn.Module):
         self.linear = nn.Linear(semantic_unit.out_features, 
                                 self.visual_fe.features)
         self.relu = nn.ReLU(inplace=True)
-    
+        
     def forward(self, 
                 image: torch.FloatTensor = None, 
                 semantic_repr: torch.Tensor = None):

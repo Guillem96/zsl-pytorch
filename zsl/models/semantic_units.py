@@ -18,10 +18,14 @@ class LinearSemanticUnit(nn.Module):
         super(LinearSemanticUnit, self).__init__()
         self.linear = nn.Linear(in_features, out_features)
         self.relu = nn.ReLU()
+        self.dropout1 = nn.Dropout(.3)
+        self.dropout2 = nn.Dropout(.5)
+
         self.out_features = out_features
         
     def forward(self, x: torch.Tensor) -> torch.FloatTensor:
-        return self.relu(self.linear(x))
+        x = self.dropout1(x)
+        return self.dropout2(self.relu(self.linear(x)))
 
 
 class MultiModalSemanticUnit(nn.Module):

@@ -50,15 +50,17 @@ class ZSLImageFolder(ImageFolder):
     imgs: List[Tuple[str, int]] 
         List of (image path, class_index) tuples
     """
-    def __init__(self, 
-                 root: str, 
+
+    def __init__(self,
+                 root: str,
                  class_to_repr: Callable[[str], torch.FloatTensor],
                  zero_shot_classes: Collection[str],
                  load_unseen: bool = False,
                  load_only_unseen: bool = False,
                  *args, **kwargs):
-        
+
         is_valid_fn = kwargs.get('is_valid_file')
+
         def is_valid_file_and_is_seen(path):
             path = Path(path)
             # If the image is a zero shot file, wo do not load it
@@ -71,7 +73,7 @@ class ZSLImageFolder(ImageFolder):
                 return is_valid_fn(path)
             else:
                 return True
-        
+
         def is_valid_and_unseen(path):
             path = Path(path)
             # If the image is a zero shot file, wo do not load it
@@ -84,11 +86,11 @@ class ZSLImageFolder(ImageFolder):
                 return is_valid_fn(path)
             else:
                 return True
-                
+
         if not load_unseen:
             kwargs['is_valid_file'] = is_valid_file_and_is_seen
 
-        if load_only_unseen: 
+        if load_only_unseen:
             kwargs['is_valid_file'] = is_valid_and_unseen
 
         super(ZSLImageFolder, self).__init__(root, *args, **kwargs)
@@ -98,19 +100,19 @@ class ZSLImageFolder(ImageFolder):
 
     @property
     def valid_classes(self):
-        path_2_label = lambda p: Path(p).parent.stem
+        def path_2_label(p): return Path(p).parent.stem
         return set(path_2_label(o[0]) for o in self.samples)
-        
+
     def semantic_representations(self) -> Sequence[Any]:
         return [self.class_to_repr(o) for o in self.classes]
-        
+
     def __getitem__(self, index: int):
         path, target = self.samples[index]
         sample = self.loader(path)
 
         if self.transform is not None:
             sample = self.transform(sample)
-        
+
         semantic = self.class_to_repr(self.classes[target])
 
         if self.target_transform is not None:
@@ -120,10 +122,21 @@ class ZSLImageFolder(ImageFolder):
 
 
 class AwAFeaturesDataset(Dataset):
+    _train_names = [
+        "killer+whale", "beaver", "dalmatian", "persian+cat", "german+shepherd", 
+        "siamese+cat", "skunk", "mole", "tiger", "hippopotamus", "leopard", 
+        "spider+monkey", "elephant", "gorilla", "ox", "chimpanzee", "hamster", 
+        "fox", "squirrel", "rabbit", "wolf", "chihuahua", "weasel", "otter", 
+        "buffalo", "zebra", "giant+panda", "pig", "lion", "polar+bear", "collie", 
+        "cow", "deer", "mouse", "humpback+whale", "antelope", "grizzly+bear", 
+        "rhinoceros", "raccoon", "moose"]
 
-    def __init__(self, 
-                 root: str, 
-                 features_type: str = 'cq-hist',
+    _test_names = ["sheep", "dolphin", "bat", "seal", "blue+whale", "rat", "horse", 
+        "walrus", "giraffe", "bobcat"]
+
+    def __init__(self,
+                 root: str,
+                 features_type: str = 'ResNet-101',
                  load_unseen: bool = False,
                  load_only_unseen: bool = False):
 
@@ -140,60 +153,58 @@ class AwAFeaturesDataset(Dataset):
             return {c.strip(): int(i) - 1 for i, c in split_lines}
 
         self.class_to_idx = file_to_mapping(root / 'classes.txt')
-
+        self.classes = [k for k, _ in 
+                        sorted(self.class_to_idx.items(), 
+                               key=lambda item: item[1])]
+        
         # Get Zero Shot classes and Non Zero Shot
-        def get_classes(f):
-            return [o.split('\t')[-1].strip() for o in f.open().readlines()]
-
-        self.training_casses = get_classes(root / 'trainclasses.txt')
-        self.zero_shot_classes = get_classes(root / 'testclasses.txt')
-        self.classes = get_classes(root / 'classes.txt')
+        self.training_casses = AwAFeaturesDataset._train_names
+        self.zero_shot_classes = AwAFeaturesDataset._test_names
 
         # Generate attributes name to idx
-        self.attrs = get_classes(root / 'predicates.txt')
         self.attr_to_idx = file_to_mapping(root / 'predicates.txt')
+        self.attrs = [k for k, _ in 
+                      sorted(self.attr_to_idx.items(), 
+                             key=lambda item: item[1])]
 
         # Load mapping class to features
         self.attr_matrix = root / 'predicate-matrix-continuous.txt'
         self.attr_matrix = self.attr_matrix.open().readlines()
-        self.attr_matrix = [list(map(float, l.split())) 
+        self.attr_matrix = [list(map(float, l.split()))
                             for l in self.attr_matrix]
-        # self.attr_matrix = torch.FloatTensor(self.attr_matrix)
+        self.attr_matrix = torch.FloatTensor(self.attr_matrix)
+        self.attr_matrix = (self.attr_matrix -
+                            self.attr_matrix.mean(0)) / self.attr_matrix.std(0)
 
-        # Create the dataset samples from folder
-        self.samples = folder.make_dataset(str(features_root), 
-                                           self.class_to_idx, 
-                                           extensions=('.txt', ))
+        # Create the dataset samples from features files
+        features = (features_root / 'AwA2-features.txt').open().readlines()
+        targets = (features_root / 'AwA2-labels.txt').open().readlines()
+        targets = [int(l) - 1 for l in targets]
+        self.samples = list(zip(features, targets))
 
         if not load_unseen:
-            self.samples = [(p, t) for p, t in self.samples 
+            self.samples = [(p, t) for p, t in self.samples
                             if self.classes[t] in self.training_casses]
-            
+
         if load_only_unseen:
-            self.samples = [(p, t) for p, t in self.samples 
+            self.samples = [(p, t) for p, t in self.samples
                             if self.classes[t] in self.zero_shot_classes]
 
     @property
     def valid_classes(self):
-        path_2_label = lambda p: Path(p).parent.stem
-        return set(path_2_label(o[0]) for o in self.samples)
-    
+        return set(self.classes[t] for _, t in self.samples)
+
     def class_to_repr(self, class_: Union[str, int]):
         if isinstance(class_, str):
             class_ = self.class_to_idx[class_]
         return self.attr_matrix[class_]
 
-    def loader(self, p: str):
-        with open(p) as f:
-            features = [float(o) for o in f.read().split()]
-        return torch.FloatTensor(features)
-            
     def __getitem__(self, index: int):
-        path, target = self.samples[index]
-        sample = self.loader(path)
+        features, target = self.samples[index]
+        sample = torch.FloatTensor([float(o) for o in features.split()])
         semantic = self.class_to_repr(target)
 
-        return sample, target, (semantic - 5. / 2.)
-    
+        return sample, target, semantic
+
     def __len__(self):
         return len(self.samples)
